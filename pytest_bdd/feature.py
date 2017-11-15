@@ -33,6 +33,7 @@ import textwrap
 import glob2
 import six
 
+from . import translation
 from . import types
 from . import exceptions
 
@@ -41,7 +42,7 @@ from . import exceptions
 features = {}
 
 
-STEP_PREFIXES = [
+DEFAULT_STEP_PREFIXES = [
     ("Feature: ", types.FEATURE),
     ("Scenario Outline: ", types.SCENARIO_OUTLINE),
     ("Examples: Vertical", types.EXAMPLES_VERTICAL),
@@ -54,9 +55,11 @@ STEP_PREFIXES = [
     ("@", types.TAG),
     ("And ", None),  # Unknown step type,
 ]
+STEP_PREFIXES = DEFAULT_STEP_PREFIXES
 
 STEP_PARAM_RE = re.compile("\<(.+?)\>")
 COMMENT_RE = re.compile('(^|(?<=\s))#')
+LANG_COMMENT_RE = re.compile("^#\s*language:\s*(\S+)")
 
 
 def get_step_type(line):
@@ -69,6 +72,20 @@ def get_step_type(line):
     for prefix, _type in STEP_PREFIXES:
         if line.startswith(prefix):
             return _type
+
+
+def check_set_language(line):
+    """Check for an explicit language setting comment and applies the change.
+
+    :param str line: The line to check.
+    """
+    global STEP_PREFIXES
+    res = LANG_COMMENT_RE.search(line)
+    if res:
+        lang_code = res.group(1)
+        STEP_PREFIXES = translation.get_language(lang_code)
+    else:
+        STEP_PREFIXES = DEFAULT_STEP_PREFIXES
 
 
 def strip_comments(line):
@@ -276,6 +293,8 @@ class Feature(object):
 
         with codecs.open(filename, encoding=encoding) as f:
             content = force_unicode(f.read(), encoding)
+            # only check first line for language
+            check_set_language(content)
             for line_number, line in enumerate(content.splitlines(), start=1):
                 unindented_line = line.lstrip()
                 line_indent = len(line) - len(unindented_line)
@@ -297,7 +316,7 @@ class Feature(object):
                 if not strict_gherkin:
                     allowed_prev_mode += (types.WHEN, )
 
-                if not scenario and prev_mode not in allowed_prev_mode  and mode in types.STEP_TYPES:
+                if not scenario and prev_mode not in allowed_prev_mode and mode in types.STEP_TYPES:
                     raise exceptions.FeatureError(
                         "Step definition outside of a Scenario or a Background", line_number, clean_line, filename)
 
