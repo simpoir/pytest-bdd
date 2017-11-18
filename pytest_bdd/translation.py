@@ -1,5 +1,6 @@
 """Gherkin translations loader."""
 
+import codecs
 import json
 import pkg_resources as pkg
 
@@ -46,7 +47,8 @@ def load_translations(cache):
     :param dict cache: dict into which to load {lang_code: STEP_PREFIXES}
     """
     lang_file = pkg.resource_stream(PACKAGE_NAME, "gherkin-languages.json")
-    translations = json.load(lang_file)
+    utf8_reader = codecs.getreader("utf-8")
+    translations = json.load(utf8_reader(lang_file))
     for lang_code, translation in translations.items():
         language = [
             ("@", types.TAG),
